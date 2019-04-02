@@ -16,7 +16,7 @@
         public PhilosopherStates State
         {
             get => _state;
-            set
+            private set
             {
                 _state = value;
                 OnStateChange?.Invoke(_state);
@@ -25,20 +25,20 @@
 
         public event StateChangeCallback OnStateChange;
 
-        public Task Eat(object leftFork, object rightFork) =>
+        public Task Eat(object leftFork, object rightFork, TimeSpan @for) =>
             Task.Run(() =>
             {
                 try
                 {
                     do { }
-                    while (!Monitor.TryEnter(leftFork, TimeSpan.FromMilliseconds(100)));
+                    while (!Monitor.TryEnter(leftFork, TimeSpan.FromMilliseconds(1)));
 
                     do { }
-                    while (!Monitor.TryEnter(rightFork, TimeSpan.FromMilliseconds(100)));
+                    while (!Monitor.TryEnter(rightFork, TimeSpan.FromMilliseconds(1)));
 
                     State = PhilosopherStates.Eating;
 
-                    Task.Delay(TimeSpan.FromMilliseconds(300)).GetAwaiter().GetResult();
+                    Task.Delay(@for).GetAwaiter().GetResult();
 
                     State = PhilosopherStates.Thinking;
                 }

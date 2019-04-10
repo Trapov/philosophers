@@ -11,6 +11,12 @@
         private PhilosopherStates _state;
 
         public Philosopher(string name) => Name = name;
+
+        public int? TaskId { get; private set; }
+        public int? ThreadId { get; private set; }
+
+        public int EatCount { get; private set; }
+
         public string Name { get; }
 
         public PhilosopherStates State
@@ -30,17 +36,29 @@
             {
                 try
                 {
-                    do { }
-                    while (!Monitor.TryEnter(leftFork, TimeSpan.FromMilliseconds(1)));
+                    (TaskId, ThreadId) = (Task.CurrentId, Thread.CurrentThread.ManagedThreadId);
 
-                    do { }
+                    var leftForkLocked = false;
+                    do
+                    {
+                        if(leftForkLocked)
+                            Monitor.Exit(leftFork);
+                        do
+                        {
+                        }
+                        while (!(leftForkLocked = 
+                            Monitor.TryEnter(leftFork, TimeSpan.FromMilliseconds(1))));
+                    }
                     while (!Monitor.TryEnter(rightFork, TimeSpan.FromMilliseconds(1)));
 
                     State = PhilosopherStates.Eating;
 
                     Task.Delay(@for).GetAwaiter().GetResult();
 
+                    (TaskId, ThreadId) = (Task.CurrentId, Thread.CurrentThread.ManagedThreadId);
+
                     State = PhilosopherStates.Thinking;
+                    EatCount++;
                 }
                 finally
                 {

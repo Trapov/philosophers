@@ -2,13 +2,13 @@
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics;
     using System.Threading;
     using System.Threading.Tasks;
 
     public static class Program
     {
         private static IReadOnlyList<Philosopher> _philosophers;
-        private static CircullarList<object> _forks;
 
         public static void Main()
         {
@@ -17,57 +17,55 @@
             var arrangedTable = Table.ArrangeFor("Sartre", "Plato", "Socrates", "Kant", "Camus");
 
             _philosophers = arrangedTable.Philosophers;
-            _forks = arrangedTable.Forks;
 
-            Task.Run(() =>
+            var tableServingTask = Task.Run(() =>
             {
                 while(!token.IsCancellationRequested) 
-                    Task.WhenAll(arrangedTable.Serve(TimeSpan.FromMilliseconds(200))).GetAwaiter().GetResult();
+                    Task.WhenAll(arrangedTable.Serve(TimeSpan.FromMilliseconds(400))).GetAwaiter().GetResult();
             }, token.Token);
 
-            System.Console.CancelKeyPress += (_, __) => 
+            Console.CancelKeyPress += (_, __) => 
             {
-                token.Cancel();
-                System.Console.WriteLine("Cancellation has been requested.");
+                token.Cancel(throwOnFirstException: true);
+                Console.ResetColor();
+                Console.Clear();
             };
 
             while(!token.IsCancellationRequested)
-                Render();
+                Render(token.Token);
         }
 
-        private static void Render()
+        private static void Render(CancellationToken cancellationToken)
         {
-            
-            System.Console.Write("Forks : [");
-            
-            for (var i = 0; i < _forks.Count; i++)
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var process = Process.GetCurrentProcess();
+            Console.WriteLine("-------------------------");
+            Console.WriteLine("[         (0_0)          ]");
+            Console.WriteLine(@"[         / 0 \          ]");
+            Console.WriteLine(@"[         \ 0 /          ]");
+            Console.WriteLine($"[      Memory: {process.WorkingSet64 / 1024 / 1024}Mb      ]");
+            Console.WriteLine($"[      Threads: {process.Threads.Count}       ]");
+            Console.WriteLine("[                        ]");
+            Console.WriteLine("[                        ]");
+            Console.WriteLine("-------------------------");
+
+
+            foreach (var philosopher in _philosophers)
             {
-                var isLocked = !Monitor.TryEnter(_forks.At(i));
-
-                if(!isLocked)
-                    Monitor.Exit(_forks.At(i));
-                
-                System.Console.ForegroundColor = isLocked ? ConsoleColor.DarkRed : ConsoleColor.DarkGreen;
-                
-                System.Console.Write($" {i}, ");
-                
-                System.Console.ResetColor();
+                Console.Write($"{philosopher.Name} is ");
+                Console.ForegroundColor = philosopher.State == PhilosopherStates.Thinking ? ConsoleColor.DarkRed : ConsoleColor.DarkGreen;
+                Console.Write(philosopher.State);
+                Console.ResetColor();
+                Console.Write(" => Has eaten ");
+                Console.ForegroundColor = ConsoleColor.Magenta;
+                Console.Write(philosopher.EatCount);
+                Console.ResetColor();
+                Console.Write($" times [Task:{philosopher.TaskId}, Thread:{philosopher.ThreadId}] \n");
             }
-            
-            System.Console.Write("] \n");
+            Task.Delay(65).GetAwaiter().GetResult();
 
-            System.Console.WriteLine("--------------------");
-
-            foreach(var philosopher in _philosophers)
-            {
-                System.Console.Write($"{philosopher.Name} is ");
-                System.Console.ForegroundColor = philosopher.State == PhilosopherStates.Thinking ? ConsoleColor.DarkRed : ConsoleColor.DarkGreen;
-                System.Console.Write($"{philosopher.State} \n");
-                System.Console.ResetColor();
-            }
-            Task.Delay(10).GetAwaiter().GetResult();
-
-            System.Console.Clear();
+            Console.Clear();
         }
     }
 }

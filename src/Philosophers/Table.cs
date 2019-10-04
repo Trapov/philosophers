@@ -4,15 +4,16 @@
     using System.Linq;
     using System.Threading.Tasks;
     using System;
+    using System.Threading;
 
     public static class Table
     {
         public sealed class ArrangedTable
         {
-            public ArrangedTable(IReadOnlyList<object> forks, IReadOnlyList<Philosopher> philosophers)
-                => (Forks, Philosophers) = (new CircullarList<object>(forks), philosophers);
+            public ArrangedTable(IReadOnlyList<SemaphoreSlim> forks, IReadOnlyList<Philosopher> philosophers)
+                => (Forks, Philosophers) = (new CircullarList<SemaphoreSlim>(forks), philosophers);
 
-            public CircullarList<object> Forks { get; }
+            public CircullarList<SemaphoreSlim> Forks { get; }
             public IReadOnlyList<Philosopher> Philosophers { get; internal set; }
 
             public Task[] Serve() => Serve(TimeSpan.FromMilliseconds(200));
@@ -36,7 +37,7 @@
         public static ArrangedTable ArrangeFor(params Philosopher[] philosophers) => new ArrangedTable(
                 Enumerable
                     .Range(0, philosophers.Count())
-                    .Select(x => new { Id = x })
+                    .Select(x => new SemaphoreSlim(1, 1))
                 .ToList(),
                 philosophers
             );
@@ -44,7 +45,7 @@
         public static ArrangedTable ArrangeFor(params string[] philosophersNames) => new ArrangedTable(
                 Enumerable
                     .Range(0, philosophersNames.Count())
-                    .Select(x => new { Id = x })
+                    .Select(x => new SemaphoreSlim(1, 1))
                 .ToList(),
                 philosophersNames
                     .Select(x => new Philosopher(x))

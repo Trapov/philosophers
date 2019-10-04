@@ -31,40 +31,37 @@
 
         public event StateChangeCallback OnStateChange;
 
-        public Task Eat(object leftFork, object rightFork, TimeSpan @for) =>
-            Task.Run(() =>
+        public async Task Eat(SemaphoreSlim leftFork, SemaphoreSlim rightFork, TimeSpan @for)
+        {
+            try
             {
-                try
+                (TaskId, ThreadId) = (Task.CurrentId, Thread.CurrentThread.ManagedThreadId);
+
+                var done = false;
+                do
                 {
-                    (TaskId, ThreadId) = (Task.CurrentId, Thread.CurrentThread.ManagedThreadId);
-
-                    var leftForkLocked = false;
-                    do
-                    {
-                        if(leftForkLocked)
-                            Monitor.Exit(leftFork);
-                        do
-                        {
-                        }
-                        while (!(leftForkLocked = 
-                            Monitor.TryEnter(leftFork, TimeSpan.FromMilliseconds(1))));
-                    }
-                    while (!Monitor.TryEnter(rightFork, TimeSpan.FromMilliseconds(1)));
-
-                    State = PhilosopherStates.Eating;
-
-                    Task.Delay(@for).GetAwaiter().GetResult();
-
-                    (TaskId, ThreadId) = (Task.CurrentId, Thread.CurrentThread.ManagedThreadId);
-
-                    State = PhilosopherStates.Thinking;
-                    EatCount++;
+                    if (await leftFork.WaitAsync(TimeSpan.FromMilliseconds(1)))
+                        if (await rightFork.WaitAsync(TimeSpan.FromMilliseconds(1)))
+                            done = true;
+                        else
+                            leftFork.Release(1);
                 }
-                finally
-                {
-                    Monitor.Exit(leftFork);
-                    Monitor.Exit(rightFork);
-                }
-            });
+                while (!done);
+
+                State = PhilosopherStates.Eating;
+
+                await Task.Delay(@for);
+
+                (TaskId, ThreadId) = (Task.CurrentId, Thread.CurrentThread.ManagedThreadId);
+
+                State = PhilosopherStates.Thinking;
+                EatCount++;
+            }
+            finally
+            {
+                leftFork.Release(1);
+                rightFork.Release(1);
+            }
+        }
     }
 }

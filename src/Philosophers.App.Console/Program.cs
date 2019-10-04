@@ -3,6 +3,7 @@
     using System;
     using System.Collections.Generic;
     using System.Diagnostics;
+    using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
 
@@ -10,62 +11,64 @@
     {
         private static IReadOnlyList<Philosopher> _philosophers;
 
-        public static void Main()
+        public static async Task Main()
         {
-            var token = new CancellationTokenSource();
+            using var token = new CancellationTokenSource();
 
+            await Task
+                .WhenAll(Render(token.Token), PhilosophersLogic(token.Token))
+                .ConfigureAwait(true);
+
+            token.Cancel(throwOnFirstException: true);
+            Console.ResetColor();
+            Console.Clear();
+        }
+
+        private static async Task PhilosophersLogic(CancellationToken token)
+        {
             var arrangedTable = Table.ArrangeFor("Sartre", "Plato", "Socrates", "Kant", "Camus");
 
             _philosophers = arrangedTable.Philosophers;
-
-            var tableServingTask = Task.Run(() =>
-            {
-                while(!token.IsCancellationRequested) 
-                    Task.WhenAll(arrangedTable.Serve(TimeSpan.FromMilliseconds(400))).GetAwaiter().GetResult();
-            }, token.Token);
-
-            Console.CancelKeyPress += (_, __) => 
-            {
-                token.Cancel(throwOnFirstException: true);
-                Console.ResetColor();
-                Console.Clear();
-            };
-
-            while(!token.IsCancellationRequested)
-                Render(token.Token);
+            while (!token.IsCancellationRequested)
+                await Task.WhenAll(arrangedTable.Serve(TimeSpan.FromMilliseconds(10))).ConfigureAwait(false);
         }
 
-        private static void Render(CancellationToken cancellationToken)
+        private static async Task Render(CancellationToken cancellationToken)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
             var process = Process.GetCurrentProcess();
-            Console.WriteLine("-------------------------");
-            Console.WriteLine("[         (0_0)          ]");
-            Console.WriteLine(@"[         / 0 \          ]");
-            Console.WriteLine(@"[         \ 0 /          ]");
-            Console.WriteLine($"[      Memory: {process.WorkingSet64 / 1024 / 1024}Mb      ]");
-            Console.WriteLine($"[      Threads: {process.Threads.Count}       ]");
-            Console.WriteLine("[                        ]");
-            Console.WriteLine("[                        ]");
-            Console.WriteLine("-------------------------");
 
-
-            foreach (var philosopher in _philosophers)
+            while (!cancellationToken.IsCancellationRequested)
             {
-                Console.Write($"{philosopher.Name} is ");
-                Console.ForegroundColor = philosopher.State == PhilosopherStates.Thinking ? ConsoleColor.DarkRed : ConsoleColor.DarkGreen;
-                Console.Write(philosopher.State);
-                Console.ResetColor();
-                Console.Write(" => Has eaten ");
-                Console.ForegroundColor = ConsoleColor.Magenta;
-                Console.Write(philosopher.EatCount);
-                Console.ResetColor();
-                Console.Write($" times [Task:{philosopher.TaskId}, Thread:{philosopher.ThreadId}] \n");
-            }
-            Task.Delay(65).GetAwaiter().GetResult();
+                await Task.Delay(TimeSpan.FromMilliseconds(100)).ConfigureAwait(true);
+                Console.Clear();
 
-            Console.Clear();
+                var stringBuilder =
+                    new StringBuilder()
+                        .AppendLine("-------------------------")
+                        .AppendLine("[         (0_0)          ]")
+                        .AppendLine(@"[         / 0 \          ]")
+                        .AppendLine(@"[         \ 0 /          ]")
+                        .AppendLine($"[      Memory: {process.WorkingSet64 / 1024 / 1024}Mb      ]")
+                        .AppendLine($"[      Threads: {process.Threads.Count}       ]")
+                        .AppendLine("[                        ]")
+                        .AppendLine("[                        ]")
+                        .AppendLine("-------------------------");
+
+                Console.Write(stringBuilder.ToString());
+
+                foreach (var philosopher in _philosophers)
+                {
+                    Console.Write($"{philosopher.Name} is ");
+                    Console.ForegroundColor = philosopher.State == PhilosopherStates.Thinking ? ConsoleColor.DarkRed : ConsoleColor.DarkGreen;
+                    Console.Write(philosopher.State);
+                    Console.ResetColor();
+                    Console.Write(" => Has eaten ");
+                    Console.ForegroundColor = ConsoleColor.Magenta;
+                    Console.Write(philosopher.EatCount);
+                    Console.ResetColor();
+                    Console.Write($" times [Task:{philosopher.TaskId}, Thread:{philosopher.ThreadId}] \n");
+                }
+            }
         }
     }
 }
